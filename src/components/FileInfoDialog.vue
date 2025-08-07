@@ -2,6 +2,21 @@
 import type { Input } from 'mediabunny';
 import { ref, watch } from 'vue';
 
+type TrackInfo = {
+    'Type': string;
+    'Codec': string;
+    'Full Codec String': string;
+    'Duration (seconds)': string;
+    'Language Code': string;
+} & ({
+    'Coded Width': number;
+    'Coded Height': number;
+    'Rotation': number;
+} | {
+    'Channels': number;
+    'Sample Rate (Hz)': number;
+});
+
 const props = defineProps<{
     input: Input | null;
 }>();
@@ -13,6 +28,7 @@ defineEmits<{
 const format = ref<string>('');
 const mineType = ref<string>('');
 const duration = ref<number>(0);
+const tracks = ref<TrackInfo[]>([]);
 
 watch(props, (newInput) => {
     const { input } = newInput;
@@ -20,7 +36,26 @@ watch(props, (newInput) => {
         input.getFormat().then(f => { format.value = f.name; });
         input.getMimeType().then(m => { mineType.value = m; });
         input.computeDuration().then(d => {
-            duration.value = Math.round(d * 1000) / 1000; // Convert milliseconds to seconds
+            duration.value = Math.round(d * 1000) / 1000;
+        });
+        input.getTracks().then(async t => {
+            tracks.value = await Promise.all(t.map(track => (async () => {
+                return {
+                    'Type': track.type,
+                    'Codec': track.codec,
+                    'Full Codec String': await track.getCodecParameterString(),
+                    'Duration (seconds)': await track.computeDuration().then(d => Math.round(d * 1000) / 1000),
+                    'Language Code': track.languageCode || '',
+                    ...(track.isVideoTrack() ? {
+                        'Coded Width': track.codedWidth,
+                        'Coded Height': track.codedHeight,
+                        'Rotation': track.rotation,
+                    } : track.isAudioTrack() ? {
+                        'Channels': track.numberOfChannels,
+                        'Sample Rate (Hz)': track.sampleRate,
+                    } : {})
+                } as TrackInfo;
+            })()));
         });
     } else {
         format.value = '';
@@ -34,28 +69,36 @@ watch(props, (newInput) => {
 <div ref="root" class="modal" :class="$style.root" tabindex="-1" @click.self="$emit('close')">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <form class="modal-header" method="dialog">
+            <div class="modal-header">
                 <h5 class="modal-title">File Information</h5>
                 <button type="button" @click="$emit('close')" class="btn-close" data-bs-dismiss="modal"
                     aria-label="Close"></button>
-            </form>
+            </div>
             <div class="modal-body">
                 <table class="table">
                     <tbody>
-                        <tr>
-                            <th>Format</th>
-                            <td>{{ format }}</td>
-                        </tr>
-                        <tr>
-                            <th>Mime Type</th>
-                            <td>{{ mineType }}</td>
-                        </tr>
-                        <tr>
-                            <th>Duration</th>
-                            <td>{{ duration }} seconds</td>
-                        </tr>
+                        <tr><th>Format</th><td>{{ format }}</td></tr>
+                        <tr><th>Mime Type</th><td>{{ mineType }}</td></tr>
+                        <tr><th>Duration</th><td>{{ duration }} seconds</td></tr>
                     </tbody>
                 </table>
+                <h5>Tracks</h5>
+                <div v-for="(track, index) in tracks" :key="index" class="mb-3">
+                    <h6>Track {{ index + 1 }} ({{ track.Type }})</h6>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(value, key) in track" :key="key">
+                                <td>{{ key }}</td><td>{{ value }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import FileInfoDialog from './components/FileInfoDialog.vue';
-import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
+import { ALL_FORMATS, BlobSource, Conversion, Input, MkvOutputFormat, MovOutputFormat, Mp4OutputFormat, Output, QUALITY_HIGH, QUALITY_LOW, QUALITY_MEDIUM, QUALITY_VERY_HIGH, QUALITY_VERY_LOW, StreamTarget, WebMOutputFormat } from 'mediabunny';
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const file = ref<File | null>(null);
@@ -12,25 +12,289 @@ const input = computed(() => file.value ?
   }) :
   null
 );
+
+const currentConversion = ref<Conversion | null>(null);
+const currentConversionPromise = ref<Promise<void> | null>(null);
+const progressPercentage = ref<number>(0);
+const logs = ref<string[]>([]);
+const resultUrl = ref<string | null>(null);
+
 const showFileInfoDialog = ref(false);
+
+const enableWidth = ref(true);
+const enableHeight = ref(true);
+const width = ref<number>(720);
+const height = ref<number>(720);
+const fit = ref<'contain' | 'cover' | 'fill'>('contain');
+const container = ref<'mp4' | 'mov' | 'webm' | 'mkv'>('mp4');
+type VideoCodec = 'avc' | 'vp9' | 'av1';
+const vcodec = ref<VideoCodec | 'AS_IS' | 'DISCARD'>('avc');
+type AudioCodec = 'aac' | 'mp3' | 'opus' | 'vorbis' | 'flac' | 'pcm-s16' | 'pcm-s24' | 'pcm-f32';
+const acodec = ref<AudioCodec | 'AS_IS' | 'DISCARD'>('aac');
+
+type BitrateQuality = 'verylow' | 'low' | 'medium' | 'high' | 'veryhigh';
+const vbitrate = ref<BitrateQuality>('medium');
+const abitrate = ref<BitrateQuality>('medium');
+
+const keyFrameSeconds = ref<number>(2);
+const aSampleRate = ref<'44.1' | '48' | '96' | '192' | '384'>('96');
+
+function convertBitrate(quality: BitrateQuality) {
+  switch (quality) {
+    case 'verylow': return QUALITY_VERY_LOW;
+    case 'low': return QUALITY_LOW;
+    case 'medium': return QUALITY_MEDIUM;
+    case 'high': return QUALITY_HIGH;
+    case 'veryhigh': return QUALITY_VERY_HIGH;
+    default: return QUALITY_MEDIUM;
+  }
+}
+
+async function transpile() {
+  if (resultUrl.value) URL.revokeObjectURL(resultUrl.value);
+  resultUrl.value = null;
+
+  if (!input.value) return;
+
+  try {
+    logs.value.push(`${new Date().toJSON()}`);
+    logs.value.push('Starting transpiling...');
+
+    const transformStream = new TransformStream();
+
+    const output = new Output({
+      format: container.value === 'mp4'
+          ? new Mp4OutputFormat({
+            fastStart: 'fragmented',
+            minimumFragmentDuration: keyFrameSeconds.value,
+          })
+          : container.value === 'mov'
+            ? new MovOutputFormat({
+              fastStart: 'fragmented',
+              minimumFragmentDuration: keyFrameSeconds.value,
+            })
+          : container.value === 'webm'
+            ? new WebMOutputFormat()
+            : new MkvOutputFormat(),
+      target: new StreamTarget(transformStream.writable),
+    });
+
+    const conversion = await Conversion.init({
+      input: input.value,
+      output: output,
+      video: vcodec.value === 'DISCARD' ? {
+        discard: true,
+      } :
+        vcodec.value === 'AS_IS' ? 
+        undefined
+       : {
+          codec: vcodec.value,
+          bitrate: convertBitrate(vbitrate.value),
+          width: enableWidth.value ? width.value : undefined,
+          height: enableHeight.value ? height.value : undefined,
+          fit: fit.value,
+          forceTranscode: true,
+        },
+      audio: acodec.value === 'DISCARD' ? {
+        discard: true,
+      } :
+        acodec.value === 'AS_IS' ? 
+        undefined
+      : {
+          codec: acodec.value,
+          bitrate: convertBitrate(abitrate.value),
+          sampleRate: aSampleRate.value === '44.1' ? 44100 :
+            aSampleRate.value === '48' ? 48000 :
+            aSampleRate.value === '96' ? 96000 :
+            aSampleRate.value === '192' ? 192000 :
+            aSampleRate.value === '384' ? 384000 : undefined,
+          forceTranscode: true,
+        },
+    });
+
+    conversion.discardedTracks.forEach(track => {
+      logs.value.push(`Track ${track.track.id} (${track.track.type}) discarded: ${track.reason}`);
+    });
+
+    conversion.onProgress = (progress) => {
+      progressPercentage.value = Math.round(progress * 100);
+    };
+
+    currentConversionPromise.value = conversion.execute().then(() => {
+      logs.value.push('Transpiling completed.');
+
+      conversion.discardedTracks.forEach(track => {
+        logs.value.push(`Track ${track.track.id} (${track.track.type}) discarded: ${track.reason}`);
+      });
+  
+      currentConversion.value = null;
+      currentConversionPromise.value = null;
+    });
+
+    currentConversion.value = conversion;
+
+    const response = new Response(transformStream.readable);
+    const blob = await response.blob();
+    console.log(blob);
+    resultUrl.value = URL.createObjectURL(blob);
+  } catch (error) {
+    console.error(error);
+    logs.value.push(`Transpiling failed: ${error instanceof Error ? error.message : String(error)}`);
+    currentConversion.value = null;
+    currentConversionPromise.value = null;
+  }
+}
+
+async function cancelTranspile() {
+  if (currentConversion.value) {
+    currentConversion.value.cancel();
+    logs.value.push('Transpiling cancelled.');
+    currentConversion.value = null;
+    currentConversionPromise.value = null;
+  }
+  if (resultUrl.value) URL.revokeObjectURL(resultUrl.value);
+  resultUrl.value = null;
+}
 </script>
 
 <template>
   <nav class="navbar bg-body-tertiary">
-    <div class="container-fluid">
+    <div class="container">
       <a class="navbar-brand" href="/">Mediabunny Test</a>
     </div>
   </nav>
   <div class="content">
     <div class="container">
       <div class="row">
-      <div class="col-md-8 py-3">
-        <input type="file" class="form-control" ref="fileInput" accept="video/*,audio/*" @change="file = fileInput?.files?.[0] || null" />
+        <div class="col-md-8 my-3">
+          <input type="file" class="form-control" ref="fileInput" accept="video/*,audio/*" @change="file = fileInput?.files?.[0] || null" />
+        </div>
+        <div class="col-md-4 my-3">
+          <button v-if="file" class="btn btn-primary w-100" @click="showFileInfoDialog = true">Show File Info</button>
+          <a v-else class="btn btn-primary disabled w-100" role="button" aria-disabled="true">Show File Info</a>
+        </div>
       </div>
-      <div class="col-md-4 py-3">
-        <button v-if="file" class="btn btn-primary w-100" @click="showFileInfoDialog = true">Show File Info</button>
-        <a v-else class="btn btn-primary disabled w-100" role="button" aria-disabled="true">Show File Info</a>
-      </div>
+      <div class="row">
+        <div>
+          <h4>Transpile</h4>
+        </div>
+        <div class="col-lg-6 my-3">
+          <label class="form-label">Output Type</label>
+          <div class="input-group mb-3">
+            <select class="form-select" aria-label="Fit" v-model="container">
+              <optgroup label="Choose container format">
+                <option value="mp4">MP4</option>
+                <option value="mov">MOV</option>
+                <option value="webm">WebM</option>
+                <option value="mkv">MKV</option>
+              </optgroup>
+            </select>
+            <select class="form-select" aria-label="Fit" v-model="vcodec">
+              <optgroup label="Choose video codec">
+                <option value="avc">H.264</option>
+                <option value="vp9">VP9</option>
+                <option value="av1">AV1</option>
+              </optgroup>
+              <option value="AS_IS">No video transpile</option>
+              <option value="DISCARD">Discard video tracks</option>
+            </select>
+            <select class="form-select" aria-label="Fit" v-model="acodec">
+              <optgroup label="Choose audio codec">
+                <option value="aac">AAC</option>
+                <option value="mp3">MP3</option>
+                <option value="opus">Opus</option>
+                <option value="vorbis">Vorbis</option>
+                <option value="flac">FLAC</option>
+                <option value="pcm-s16">PCM 16-bit</option>
+                <option value="pcm-s24">PCM 24-bit</option>
+                <option value="pcm-f32">PCM 32-bit float</option>
+              </optgroup>
+              <option value="AS_IS">No audio transpile</option>
+              <option value="DISCARD">Discard audio tracks</option>
+            </select>
+          </div>
+
+          <button v-if="!currentConversion" class="btn btn-primary w-100" @click="transpile">Start Transpile</button>
+          <button v-else class="btn btn-secondary w-100" @click="cancelTranspile">Cancel Transpile</button>
+        </div>
+
+        <div class="col-lg-6">
+          <!-- Status -->
+          <div v-if="currentConversion" class="progress mb-3" role="progressbar" aria-label="Transpile progress" :aria-valuenow="progressPercentage" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" :style="{ width: progressPercentage + '%' }">{{ progressPercentage }}%</div>
+          </div>
+          <div v-else class="progress mb-3" role="progressbar" aria-label="Transpile progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width: 0%"></div>
+          </div>
+          <textarea class="form-control" :value="Array.from(logs).reverse().join('\n')" rows="5" readonly />
+        </div>
+
+        <div class="col-lg-6 my-3">
+          <label class="form-label">Video Size</label>
+          <div class="input-group mb-3">
+            <div class="input-group-text">
+              <div class="form-check form-switch mt-0">
+                <input class="form-check-input" type="checkbox" id="enableWidth" v-model="enableWidth" aria-label="Enable width">
+                <label class="form-check-label" for="enableWidth">Width</label>
+              </div>
+            </div>
+            <input type="number" class="form-control" :class="$style.whinput" aria-label="Width" v-model="width" />
+            <div class="input-group-text">
+              <div class="form-check form-switch mt-0">
+                <input class="form-check-input" type="checkbox" id="enableHeight" v-model="enableHeight" aria-label="Enable height">
+                <label class="form-check-label" for="enableHeight">Height</label>
+              </div>
+            </div>
+            <input type="number" class="form-control" :class="$style.whinput" aria-label="Height" v-model="height" />
+            <select class="form-select" aria-label="Fit" v-model="fit">
+              <option value="contain">contain</option>
+              <option value="cover">cover</option>
+              <option value="fill">fill</option>
+            </select>
+          </div>
+          <label class="form-label">Video Settings</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Bitrate</span>
+            <select class="form-select" aria-label="Video Bitrate" v-model="vbitrate">
+              <option value="verylow">Very Low</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="veryhigh">Very High</option>
+            </select>
+            <span class="input-group-text">Key Frame Interval (sec.)</span>
+            <input type="number" class="form-control" aria-label="Key Frame Interval" v-model="keyFrameSeconds" />
+          </div>
+        </div>
+
+        <div class="col-lg-6 my-3">
+          <label class="form-label">Audio Settings</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Bitrate</span>
+            <select class="form-select" aria-label="Audio Bitrate" v-model="abitrate">
+              <option value="verylow">Very Low</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="veryhigh">Very High</option>
+            </select>
+            <span class="input-group-text">Sample Rate</span>
+            <select class="form-select" aria-label="Audio Sample Rate" v-model="aSampleRate">
+              <option value="44.1">44.1 kHz</option>
+              <option value="48">48 kHz</option>
+              <option value="96">96 kHz</option>
+              <option value="192">192 kHz</option>
+              <option value="384">384 kHz</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="">
+          <video v-if="resultUrl" class="w-100" style="max-height: 400px; object-fit: contain;" controls>
+            <source :src="resultUrl">
+            Your browser does not support the video tag.
+          </video>
+        </div>
       </div>
     </div>
   </div>
@@ -38,5 +302,7 @@ const showFileInfoDialog = ref(false);
 </template>
 
 <style lang="scss" module>
-
+.whinput {
+  min-width: 6rem !important;
+}
 </style>
