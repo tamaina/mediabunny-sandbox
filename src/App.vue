@@ -235,25 +235,27 @@ async function cancelTranspile() {
         <div class="col-lg-6 my-3">
           <label class="form-label">Output Type</label>
           <div class="input-group mb-3">
-            <select class="form-select" aria-label="Fit" v-model="container">
-              <optgroup label="Choose container format">
+            <div class="form-floating">
+              <select class="form-select" id="formContainer" aria-label="Fit" v-model="container">
                 <option value="mp4">MP4</option>
                 <option value="mov">MOV</option>
                 <option value="webm">WebM</option>
                 <option value="mkv">MKV</option>
-              </optgroup>
-            </select>
-            <select class="form-select" aria-label="Fit" v-model="vcodec">
-              <optgroup label="Choose video codec">
+              </select>
+              <label for="formContainer">Container Format</label>
+            </div>
+            <div class="form-floating">
+              <select class="form-select" id="formVideoCodec" aria-label="Fit" v-model="vcodec">
                 <option value="avc">H.264</option>
                 <option value="vp9">VP9</option>
                 <option value="av1">AV1</option>
-              </optgroup>
-              <option value="AS_IS">No video transpile</option>
-              <option value="DISCARD">Discard video tracks</option>
-            </select>
-            <select class="form-select" aria-label="Fit" v-model="acodec">
-              <optgroup label="Choose audio codec">
+                <option value="AS_IS">No video transpile</option>
+                <option value="DISCARD">Discard video tracks</option>
+              </select>
+              <label for="formVideoCodec">Video Codec</label>
+            </div>
+            <div class="form-floating">
+              <select class="form-select" id="formAudioCodec" aria-label="Fit" v-model="acodec">
                 <option value="aac">AAC</option>
                 <option value="mp3">MP3</option>
                 <option value="opus">Opus</option>
@@ -262,10 +264,11 @@ async function cancelTranspile() {
                 <option value="pcm-s16">PCM 16-bit</option>
                 <option value="pcm-s24">PCM 24-bit</option>
                 <option value="pcm-f32">PCM 32-bit float</option>
-              </optgroup>
-              <option value="AS_IS">No audio transpile</option>
-              <option value="DISCARD">Discard audio tracks</option>
-            </select>
+                <option value="AS_IS">No audio transpile</option>
+                <option value="DISCARD">Discard audio tracks</option>
+              </select>
+              <label for="formAudioCodec">Audio Codec</label>
+            </div>
           </div>
 
           <button v-if="currentConversion" class="btn btn-warning w-100" @click="cancelTranspile">Cancel Transpile</button>
@@ -307,41 +310,49 @@ async function cancelTranspile() {
           </div>
           <label class="form-label">Video Settings</label>
           <div class="input-group mb-3">
-            <span class="input-group-text">Bitrate</span>
-            <select class="form-select" aria-label="Video Bitrate" v-model="vbitrate">
-              <option value="verylow">Very Low</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="veryhigh">Very High</option>
-            </select>
-            <span class="input-group-text">Key Frame Interval (sec.)</span>
-            <input type="number" class="form-control" aria-label="Key Frame Interval" v-model="keyFrameSeconds" />
+            <div class="form-floating">
+              <select class="form-select" id="vBitrate" aria-label="Video Bitrate" v-model="vbitrate">
+                <option value="verylow">Very Low</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="veryhigh">Very High</option>
+              </select>
+              <label for="vBitrate">Video Bitrate</label>
+            </div>
+            <div class="form-floating">
+              <input type="number" class="form-control" id="keyFrameInterval" aria-label="Key Frame Interval" v-model="keyFrameSeconds" />
+              <label for="keyFrameInterval">Key Frame Interval (sec.)</label>
+            </div>
           </div>
         </div>
 
         <div class="col-lg-6 my-3">
           <label class="form-label">Audio Settings</label>
           <div class="input-group mb-3">
-            <span class="input-group-text">Bitrate</span>
-            <select class="form-select" aria-label="Audio Bitrate" v-model="abitrate">
-              <option value="verylow">Very Low</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="veryhigh">Very High</option>
-            </select>
-            <span class="input-group-text">Sample Rate</span>
-            <select class="form-select" aria-label="Audio Sample Rate" v-model="aSampleRate">
-              <option value="44.1">44.1 kHz</option>
-              <option value="48">48 kHz</option>
-              <option value="96">96 kHz</option>
-              <option value="192">192 kHz</option>
-              <option value="384">384 kHz</option>
-            </select>
+            <div class="form-floating">
+              <select class="form-select" id="aBitrate" aria-label="Audio Bitrate" v-model="abitrate">
+                <option value="verylow">Very Low</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="veryhigh">Very High</option>
+              </select>
+              <label for="aBitrate">Audio Bitrate</label>
+            </div>
+            <div class="form-floating">
+              <select class="form-select" id="aSampleRate" aria-label="Audio Sample Rate" v-model="aSampleRate">
+                <option value="44.1">44.1 kHz</option>
+                <option value="48">48 kHz</option>
+                <option value="96">96 kHz</option>
+                <option value="192">192 kHz</option>
+                <option value="384">384 kHz</option>
+              </select>
+              <label for="aSampleRate">Audio Sample Rate</label>
+            </div>
           </div>
         </div>
-        
+
         <div class="">
           <div v-if="resultUrl" class="input-group mb-3">
             <a class=" btn btn-primary flex-grow-1" :href="resultUrl" :download="resultFileName">Download</a>
