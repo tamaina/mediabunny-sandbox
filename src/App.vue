@@ -232,7 +232,76 @@ async function cancelTranspile() {
         <div>
           <h4>Transpile</h4>
         </div>
-        <div class="col-lg-6 my-3">
+
+        <div class="col-lg-6 my-2">
+          <label class="form-label">Video Size</label>
+          <div class="input-group mb-3">
+            <div class="input-group-text">
+              <div class="form-check form-switch mt-0">
+                <input class="form-check-input" type="checkbox" id="enableWidth" v-model="enableWidth" aria-label="Enable width">
+                <label class="form-check-label" for="enableWidth">Width</label>
+              </div>
+            </div>
+            <input type="number" class="form-control" :class="$style.whinput" aria-label="Width" v-model="width" />
+            <div class="input-group-text">
+              <div class="form-check form-switch mt-0">
+                <input class="form-check-input" type="checkbox" id="enableHeight" v-model="enableHeight" aria-label="Enable height">
+                <label class="form-check-label" for="enableHeight">Height</label>
+              </div>
+            </div>
+            <input type="number" class="form-control" :class="$style.whinput" aria-label="Height" v-model="height" />
+            <select class="form-select" aria-label="Fit" v-model="fit">
+              <option value="contain">contain</option>
+              <option value="cover">cover</option>
+              <option value="fill">fill</option>
+            </select>
+          </div>
+          <label class="form-label">Video Settings</label>
+          <div class="input-group mb-3">
+            <div class="form-floating">
+              <select class="form-select" id="vBitrate" aria-label="Video Bitrate" v-model="vbitrate">
+                <option value="verylow">Very Low</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="veryhigh">Very High</option>
+              </select>
+              <label for="vBitrate">Video Bitrate</label>
+            </div>
+            <div class="form-floating">
+              <input type="number" class="form-control" id="keyFrameInterval" aria-label="Key Frame Interval" v-model="keyFrameSeconds" />
+              <label for="keyFrameInterval">Key Frame Interval (sec.)</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6 my-2">
+          <label class="form-label">Audio Settings</label>
+          <div class="input-group mb-3">
+            <div class="form-floating">
+              <select class="form-select" id="aBitrate" aria-label="Audio Bitrate" v-model="abitrate">
+                <option value="verylow">Very Low</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="veryhigh">Very High</option>
+              </select>
+              <label for="aBitrate">Audio Bitrate</label>
+            </div>
+            <div class="form-floating">
+              <select class="form-select" id="aSampleRate" aria-label="Audio Sample Rate" v-model="aSampleRate">
+                <option value="44.1">44.1 kHz</option>
+                <option value="48">48 kHz</option>
+                <option value="96">96 kHz</option>
+                <option value="192">192 kHz</option>
+                <option value="384">384 kHz</option>
+              </select>
+              <label for="aSampleRate">Audio Sample Rate</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6 my-2">
           <label class="form-label">Output Type</label>
           <div class="input-group mb-3">
             <div class="form-floating">
@@ -276,84 +345,15 @@ async function cancelTranspile() {
           <button v-else class="btn btn-outline-secondary w-100" disabled>Choose File First</button>
         </div>
 
-        <div class="col-lg-6">
-          <!-- Status -->
+        <div class="col-lg-6 my-2">
           <div class="progress mb-3" role="progressbar" aria-label="Transpile progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
             <div v-if="currentConversion" class="progress-bar progress-bar-striped progress-bar-animated" :style="{ width: progressPercentage + '%' }">{{ progressPercentage }}%</div>
             <div v-else class="progress-bar" style="width: 0%"></div>
           </div>
-          <textarea class="form-control" :value="Array.from(logs).reverse().join('\n')" rows="5" readonly />
+          <textarea class="form-control" :class="$style.logs" rows="5" :value="Array.from(logs).reverse().join('\n')" readonly />
         </div>
 
-        <div class="col-lg-6 my-3">
-          <label class="form-label">Video Size</label>
-          <div class="input-group mb-3">
-            <div class="input-group-text">
-              <div class="form-check form-switch mt-0">
-                <input class="form-check-input" type="checkbox" id="enableWidth" v-model="enableWidth" aria-label="Enable width">
-                <label class="form-check-label" for="enableWidth">Width</label>
-              </div>
-            </div>
-            <input type="number" class="form-control" :class="$style.whinput" aria-label="Width" v-model="width" />
-            <div class="input-group-text">
-              <div class="form-check form-switch mt-0">
-                <input class="form-check-input" type="checkbox" id="enableHeight" v-model="enableHeight" aria-label="Enable height">
-                <label class="form-check-label" for="enableHeight">Height</label>
-              </div>
-            </div>
-            <input type="number" class="form-control" :class="$style.whinput" aria-label="Height" v-model="height" />
-            <select class="form-select" aria-label="Fit" v-model="fit">
-              <option value="contain">contain</option>
-              <option value="cover">cover</option>
-              <option value="fill">fill</option>
-            </select>
-          </div>
-          <label class="form-label">Video Settings</label>
-          <div class="input-group mb-3">
-            <div class="form-floating">
-              <select class="form-select" id="vBitrate" aria-label="Video Bitrate" v-model="vbitrate">
-                <option value="verylow">Very Low</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="veryhigh">Very High</option>
-              </select>
-              <label for="vBitrate">Video Bitrate</label>
-            </div>
-            <div class="form-floating">
-              <input type="number" class="form-control" id="keyFrameInterval" aria-label="Key Frame Interval" v-model="keyFrameSeconds" />
-              <label for="keyFrameInterval">Key Frame Interval (sec.)</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-lg-6 my-3">
-          <label class="form-label">Audio Settings</label>
-          <div class="input-group mb-3">
-            <div class="form-floating">
-              <select class="form-select" id="aBitrate" aria-label="Audio Bitrate" v-model="abitrate">
-                <option value="verylow">Very Low</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="veryhigh">Very High</option>
-              </select>
-              <label for="aBitrate">Audio Bitrate</label>
-            </div>
-            <div class="form-floating">
-              <select class="form-select" id="aSampleRate" aria-label="Audio Sample Rate" v-model="aSampleRate">
-                <option value="44.1">44.1 kHz</option>
-                <option value="48">48 kHz</option>
-                <option value="96">96 kHz</option>
-                <option value="192">192 kHz</option>
-                <option value="384">384 kHz</option>
-              </select>
-              <label for="aSampleRate">Audio Sample Rate</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="">
+        <div class="mt-5 mb-3">
           <div v-if="resultUrl" class="input-group mb-3">
             <a class=" btn btn-primary flex-grow-1" :href="resultUrl" :download="resultFileName">Download</a>
             <button class="btn btn-secondary" @click="showResultInfoDialog = true">Show Info</button>
@@ -375,5 +375,10 @@ async function cancelTranspile() {
 <style lang="scss" module>
 .whinput {
   min-width: 6rem !important;
+}
+
+.logs {
+  font-size: 0.8rem;
+  font-family: monospace;
 }
 </style>

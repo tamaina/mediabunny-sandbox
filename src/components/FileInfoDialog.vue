@@ -8,7 +8,7 @@ type TrackInfo = {
     'Full Codec String': string;
     'Duration (seconds)': string;
     'Language Code': string;
-    'Packet Count for stats': number;
+    'Packet Count': number;
     'Packet Rate (avg.)': string;
     'Bitrate (avg.)': string;
 } & ({
@@ -62,7 +62,7 @@ watch(props, (newInput) => {
                     'Full Codec String': await track.getCodecParameterString(),
                     'Duration (seconds)': await track.computeDuration().then(d => Math.round(d * 1000) / 1000),
                     'Language Code': track.languageCode || '',
-                    'Packet Count for stats': stats.packetCount,
+                    'Packet Count': stats.packetCount,
                     'Packet Rate (avg.)': track.isVideoTrack() ? `${stats.averagePacketRate.toFixed(2)} FPS` : `${stats.averagePacketRate.toFixed(2)}`,
                     'Bitrate (avg.)': formatBitrate(stats.averageBitrate),
                     ...(track.isVideoTrack() ? {
