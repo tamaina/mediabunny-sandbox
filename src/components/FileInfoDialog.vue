@@ -8,6 +8,9 @@ type TrackInfo = {
     'Full Codec String': string;
     'Duration (seconds)': string;
     'Language Code': string;
+    'Packet Count for stats': number;
+    'Packet Rate (avg.)': string;
+    'Bitrate (avg.)': string;
 } & ({
     'Coded Width': number;
     'Coded Height': number;
@@ -30,6 +33,18 @@ const mineType = ref<string>('');
 const duration = ref<number>(0);
 const tracks = ref<TrackInfo[]>([]);
 
+function formatBitrate(bps: number): string {
+    if (bps == null || !isFinite(bps) || bps < 0) return '';
+    const units = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps']; // decimal units for bitrate
+    let i = 0;
+    let value = bps;
+    while (value >= 1000 && i < units.length - 1) {
+        value /= 1000;
+        i++;
+    }
+    return `${value.toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
+}
+
 watch(props, (newInput) => {
     const { input } = newInput;
     if (input) {
@@ -40,12 +55,16 @@ watch(props, (newInput) => {
         });
         input.getTracks().then(async t => {
             tracks.value = await Promise.all(t.map(track => (async () => {
+                const stats = await track.computePacketStats();
                 return {
                     'Type': track.type,
                     'Codec': track.codec,
                     'Full Codec String': await track.getCodecParameterString(),
                     'Duration (seconds)': await track.computeDuration().then(d => Math.round(d * 1000) / 1000),
                     'Language Code': track.languageCode || '',
+                    'Packet Count for stats': stats.packetCount,
+                    'Packet Rate (avg.)': track.isVideoTrack() ? `${stats.averagePacketRate.toFixed(2)} FPS` : `${stats.averagePacketRate.toFixed(2)}`,
+                    'Bitrate (avg.)': formatBitrate(stats.averageBitrate),
                     ...(track.isVideoTrack() ? {
                         'Coded Width': track.codedWidth,
                         'Coded Height': track.codedHeight,
