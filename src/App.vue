@@ -79,6 +79,7 @@ async function transpile() {
   if (resultUrl.value) URL.revokeObjectURL(resultUrl.value);
   resultUrl.value = null;
   resultMimeType.value = null;
+  resultFileSize.value = undefined;
 
   if (!input.value) return;
 
