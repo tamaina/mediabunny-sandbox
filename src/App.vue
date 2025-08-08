@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import FileInfoDialog from './components/FileInfoDialog.vue';
-import { ALL_FORMATS, BlobSource, Conversion, Input, MkvOutputFormat, MovOutputFormat, Mp4OutputFormat, Output, QUALITY_HIGH, QUALITY_LOW, QUALITY_MEDIUM, QUALITY_VERY_HIGH, QUALITY_VERY_LOW, StreamTarget, WebMOutputFormat } from 'mediabunny';
+import { ALL_FORMATS, BlobSource, Conversion, Input, MkvOutputFormat, MovOutputFormat, Mp4OutputFormat, Output, QUALITY_HIGH, QUALITY_LOW, QUALITY_MEDIUM, QUALITY_VERY_HIGH, QUALITY_VERY_LOW, StreamTarget, UrlSource, WebMOutputFormat } from 'mediabunny';
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const file = ref<File | null>(null);
@@ -24,12 +24,12 @@ const enableWidth = ref(true);
 const enableHeight = ref(false);
 const width = ref<number>(720);
 const height = ref<number>(720);
-const fit = ref<'contain' | 'cover' | 'fill'>('contain');
+const fit = ref<'contain' | 'cover' | 'fill'>('fill');
 const container = ref<'mp4' | 'mov' | 'webm' | 'mkv'>('mp4');
 type VideoCodec = 'avc' | 'vp9' | 'av1';
 const vcodec = ref<VideoCodec | 'AS_IS' | 'DISCARD'>('avc');
 type AudioCodec = 'aac' | 'mp3' | 'opus' | 'vorbis' | 'flac' | 'pcm-s16' | 'pcm-s24' | 'pcm-f32';
-const acodec = ref<AudioCodec | 'AS_IS' | 'DISCARD'>('aac');
+const acodec = ref<AudioCodec | 'AS_IS' | 'DISCARD'>('opus'); // Default to opus due to Firefox support
 
 type BitrateQuality = 'verylow' | 'low' | 'medium' | 'high' | 'veryhigh';
 const vbitrate = ref<BitrateQuality>('medium');
@@ -42,6 +42,16 @@ const fs = shallowRef<FileSystemDirectoryHandle | null>(null);
 const resultUrl = ref<string | null>(null);
 const resultMimeType = ref<string | null>(null);
 const resultFileName = ref<string | null>(null);
+const resultInput = ref<Input | null>(null);
+const showResultInfoDialog = ref(false);
+watch(resultUrl, () => {
+  if (resultUrl.value) {
+    resultInput.value = new Input({
+      formats: ALL_FORMATS,
+      source: new UrlSource(resultUrl.value),
+    });
+  }
+});
 
 function convertBitrate(quality: BitrateQuality) {
   switch (quality) {
@@ -154,6 +164,9 @@ async function transpile() {
       currentConversion.value = null;
       currentConversionPromise.value = null;
     }).catch(error => {
+      currentConversion.value = null;
+      currentConversionPromise.value = null;
+      progressPercentage.value = 0;
       logs.value.push(`Transpiling failed: ${error instanceof Error ? error.message : String(error)}`);
       console.error(error);
     });
@@ -187,7 +200,7 @@ async function cancelTranspile() {
 <template>
   <nav class="navbar bg-body-tertiary">
     <div class="container">
-      <a class="navbar-brand" href="/">Video Transpiler on Browser</a>
+      <h1 class="navbar-brand" href="/">Video Transpiler on Browser</h1>
       <span>powered by <a href="https://mediabunny.dev" target="_blank">Mediabunny</a></span>
     </div>
   </nav>
@@ -202,7 +215,7 @@ async function cancelTranspile() {
           <a v-else class="btn btn-primary disabled w-100" role="button" aria-disabled="true">Show File Info</a>
         </div>
       </div>
-      <div class="row">
+      <div class="row mt-5">
         <div>
           <h4>Transpile</h4>
         </div>
@@ -242,8 +255,9 @@ async function cancelTranspile() {
             </select>
           </div>
 
-          <button v-if="!currentConversion" class="btn btn-primary w-100" @click="transpile">Start Transpile</button>
-          <button v-else class="btn btn-secondary w-100" @click="cancelTranspile">Cancel Transpile</button>
+          <button v-if="currentConversion" class="btn btn-warning w-100" @click="cancelTranspile">Cancel Transpile</button>
+          <button v-else-if="file" class="btn btn-primary w-100" @click="transpile">Start Transpile</button>
+          <button v-else class="btn btn-outline-secondary w-100" disabled>Choose File First</button>
         </div>
 
         <div class="col-lg-6">
@@ -316,8 +330,12 @@ async function cancelTranspile() {
         </div>
         
         <div class="">
-          <a v-if="resultUrl" :href="resultUrl" :download="resultFileName">Download</a>
-          <span v-else>No video available for download</span>
+          <div v-if="resultUrl" class="input-group mb-3">
+            <a class=" btn btn-primary flex-grow-1" :href="resultUrl" :download="resultFileName">Download</a>
+            <button class="btn btn-secondary" @click="showResultInfoDialog = true">Show Info</button>
+          </div>
+
+          <a v-else class="btn btn-outline-primary disabled w-100">No video available for download</a>
           <video v-if="resultUrl" class="w-100" style="max-height: 400px; object-fit: contain;" controls>
             <source :src="resultUrl" :type="resultMimeType || undefined" />
             Your browser does not support the video tag.
@@ -327,6 +345,7 @@ async function cancelTranspile() {
     </div>
   </div>
   <FileInfoDialog v-if="showFileInfoDialog" ref="fileInfoDialog" :input="input" @close="showFileInfoDialog = false" />
+  <FileInfoDialog v-if="showResultInfoDialog" ref="resultInfoDialog" :input="resultInput" @close="showResultInfoDialog = false" />
 </template>
 
 <style lang="scss" module>
