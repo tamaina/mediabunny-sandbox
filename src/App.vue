@@ -53,6 +53,17 @@ watch(resultUrl, () => {
   }
 });
 
+const resultFileSize = ref<{ source: number; result: number }>();
+
+function formatSize(bytes: number | null | undefined, fractionDigits = 2): string {
+  if (bytes == null || isNaN(bytes)) return '';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  if (bytes === 0) return '0 B';
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(i === 0 ? 0 : fractionDigits)} ${units[i]}`;
+}
+
 function convertBitrate(quality: BitrateQuality) {
   switch (quality) {
     case 'verylow': return QUALITY_VERY_LOW;
@@ -70,6 +81,8 @@ async function transpile() {
   resultMimeType.value = null;
 
   if (!input.value) return;
+
+  const sourceFileSize = file.value?.size || 0;
 
   try {
     if (!fs.value) {
@@ -154,6 +167,7 @@ async function transpile() {
         .then(file => {
           if (file) {
             resultUrl.value = URL.createObjectURL(file);
+            resultFileSize.value = { source: sourceFileSize, result: file.size };
           }
         });
 
@@ -206,13 +220,11 @@ async function cancelTranspile() {
   </nav>
   <div class="content">
     <div class="container">
-      <div class="row">
-        <div class="col-md-8 my-3">
-          <input type="file" class="form-control" ref="fileInput" accept="video/*,audio/*" @change="file = fileInput?.files?.[0] || null" />
-        </div>
-        <div class="col-md-4 my-3">
-          <button v-if="file" class="btn btn-primary w-100" @click="showFileInfoDialog = true">Show File Info</button>
-          <a v-else class="btn btn-primary disabled w-100" role="button" aria-disabled="true">Show File Info</a>
+      <div>
+        <div class="input-group my-3">
+          <input type="file" class="form-control flex-grow-1" ref="fileInput" accept="video/*,audio/*" @change="file = fileInput?.files?.[0] || null" />
+          <span v-if="file" class="input-group-text" id="basic-addon1">{{ formatSize(file.size) }}</span>
+          <button v-if="file" class="btn btn-primary" @click="showFileInfoDialog = true">Show File Info</button>
         </div>
       </div>
       <div class="row mt-5">
@@ -334,8 +346,8 @@ async function cancelTranspile() {
             <a class=" btn btn-primary flex-grow-1" :href="resultUrl" :download="resultFileName">Download</a>
             <button class="btn btn-secondary" @click="showResultInfoDialog = true">Show Info</button>
           </div>
-
           <a v-else class="btn btn-outline-primary disabled w-100">No video available for download</a>
+          <p v-if="resultFileSize" class="text-center text-muted">Result {{ formatSize(resultFileSize.result) }} / Source {{ formatSize(resultFileSize.source) }}</p>
           <video v-if="resultUrl" class="w-100" style="max-height: 400px; object-fit: contain;" controls>
             <source :src="resultUrl" :type="resultMimeType || undefined" />
             Your browser does not support the video tag.
