@@ -220,11 +220,9 @@ async function cancelTranspile() {
 
         <div class="col-lg-6">
           <!-- Status -->
-          <div v-if="currentConversion" class="progress mb-3" role="progressbar" aria-label="Transpile progress" :aria-valuenow="progressPercentage" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar progress-bar-striped progress-bar-animated" :style="{ width: progressPercentage + '%' }">{{ progressPercentage }}%</div>
-          </div>
-          <div v-else class="progress mb-3" role="progressbar" aria-label="Transpile progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar" style="width: 0%"></div>
+          <div class="progress mb-3" role="progressbar" aria-label="Transpile progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            <div v-if="currentConversion" class="progress-bar progress-bar-striped progress-bar-animated" :style="{ width: progressPercentage + '%' }">{{ progressPercentage }}%</div>
+            <div v-else class="progress-bar" style="width: 0%"></div>
           </div>
           <textarea class="form-control" :value="Array.from(logs).reverse().join('\n')" rows="5" readonly />
         </div>
