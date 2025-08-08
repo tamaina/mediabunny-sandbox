@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import FileInfoDialog from './components/FileInfoDialog.vue';
 import { ALL_FORMATS, BlobSource, Conversion, Input, MkvOutputFormat, MovOutputFormat, Mp4OutputFormat, Output, QUALITY_HIGH, QUALITY_LOW, QUALITY_MEDIUM, QUALITY_VERY_HIGH, QUALITY_VERY_LOW, StreamTarget, WebMOutputFormat } from 'mediabunny';
 
@@ -17,12 +17,11 @@ const currentConversion = ref<Conversion | null>(null);
 const currentConversionPromise = ref<Promise<void> | null>(null);
 const progressPercentage = ref<number>(0);
 const logs = ref<string[]>([]);
-const resultUrl = ref<string | null>(null);
 
 const showFileInfoDialog = ref(false);
 
 const enableWidth = ref(true);
-const enableHeight = ref(true);
+const enableHeight = ref(false);
 const width = ref<number>(720);
 const height = ref<number>(720);
 const fit = ref<'contain' | 'cover' | 'fill'>('contain');
@@ -39,6 +38,11 @@ const abitrate = ref<BitrateQuality>('medium');
 const keyFrameSeconds = ref<number>(2);
 const aSampleRate = ref<'44.1' | '48' | '96' | '192' | '384'>('96');
 
+const fs = shallowRef<FileSystemDirectoryHandle | null>(null);
+const resultUrl = ref<string | null>(null);
+const resultMimeType = ref<string | null>(null);
+const resultFileName = ref<string | null>(null);
+
 function convertBitrate(quality: BitrateQuality) {
   switch (quality) {
     case 'verylow': return QUALITY_VERY_LOW;
@@ -53,14 +57,26 @@ function convertBitrate(quality: BitrateQuality) {
 async function transpile() {
   if (resultUrl.value) URL.revokeObjectURL(resultUrl.value);
   resultUrl.value = null;
+  resultMimeType.value = null;
 
   if (!input.value) return;
 
   try {
+    if (!fs.value) {
+      fs.value = await navigator.storage.getDirectory();
+    }
+    await fs.value.removeEntry('result').catch(() => {});
+
+    //const transformer = new TransformStream({
+    //  async transform(chunk, controller) {
+    //    // Process the chunk and push the result to the controller
+    //    logs.value.push(`${chunk.data.byteLength} bytes added`);
+    //    controller.enqueue(chunk);
+    //  }
+    //});
+
     logs.value.push(`${new Date().toJSON()}`);
     logs.value.push('Starting transpiling...');
-
-    const transformStream = new TransformStream();
 
     const output = new Output({
       format: container.value === 'mp4'
@@ -76,7 +92,7 @@ async function transpile() {
           : container.value === 'webm'
             ? new WebMOutputFormat()
             : new MkvOutputFormat(),
-      target: new StreamTarget(transformStream.writable),
+      target: new StreamTarget(await fs.value.getFileHandle('result', { create: true }).then(handle => handle.createWritable())),
     });
 
     const conversion = await Conversion.init({
@@ -116,12 +132,20 @@ async function transpile() {
       logs.value.push(`Track ${track.track.id} (${track.track.type}) discarded: ${track.reason}`);
     });
 
-    conversion.onProgress = (progress) => {
+    conversion.onProgress = async (progress) => {
       progressPercentage.value = Math.round(progress * 100);
     };
 
-    currentConversionPromise.value = conversion.execute().then(() => {
+    currentConversionPromise.value = conversion.execute().then(async () => {
       logs.value.push('Transpiling completed.');
+
+      fs.value?.getFileHandle('result')
+        .then(handle => handle.getFile())
+        .then(file => {
+          if (file) {
+            resultUrl.value = URL.createObjectURL(file);
+          }
+        });
 
       conversion.discardedTracks.forEach(track => {
         logs.value.push(`Track ${track.track.id} (${track.track.type}) discarded: ${track.reason}`);
@@ -129,14 +153,17 @@ async function transpile() {
   
       currentConversion.value = null;
       currentConversionPromise.value = null;
+    }).catch(error => {
+      logs.value.push(`Transpiling failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(error);
     });
 
-    currentConversion.value = conversion;
+    output.getMimeType().then(mimeType => {
+      resultMimeType.value = mimeType;
+    });
+    resultFileName.value = `${Date.now()}${output.format.fileExtension}`;
 
-    const response = new Response(transformStream.readable);
-    const blob = await response.blob();
-    console.log(blob);
-    resultUrl.value = URL.createObjectURL(blob);
+    currentConversion.value = conversion;
   } catch (error) {
     console.error(error);
     logs.value.push(`Transpiling failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -160,7 +187,8 @@ async function cancelTranspile() {
 <template>
   <nav class="navbar bg-body-tertiary">
     <div class="container">
-      <a class="navbar-brand" href="/">Mediabunny Test</a>
+      <a class="navbar-brand" href="/">Video Transpiler on Browser</a>
+      <span>powered by <a href="https://mediabunny.dev" target="_blank">Mediabunny</a></span>
     </div>
   </nav>
   <div class="content">
@@ -288,8 +316,10 @@ async function cancelTranspile() {
         </div>
         
         <div class="">
+          <a v-if="resultUrl" :href="resultUrl" :download="resultFileName">Download</a>
+          <span v-else>No video available for download</span>
           <video v-if="resultUrl" class="w-100" style="max-height: 400px; object-fit: contain;" controls>
-            <source :src="resultUrl">
+            <source :src="resultUrl" :type="resultMimeType || undefined" />
             Your browser does not support the video tag.
           </video>
         </div>
