@@ -22,10 +22,12 @@ const showFileInfoDialog = ref(false);
 
 const enableWidth = ref(true);
 const enableHeight = ref(false);
+const enableFps = ref(false);
 const width = ref<number>(720);
 const height = ref<number>(720);
+const fps = ref<string>('29.97');
 const fit = ref<'contain' | 'cover' | 'fill'>('fill');
-const container = ref<'mp4' | 'mov' | 'webm' | 'mkv'>('mp4');
+const container = ref<'fmp4' | 'mp4' | 'mov' | 'webm' | 'mkv'>('fmp4');
 type VideoCodec = 'avc' | 'vp9' | 'av1';
 const vcodec = ref<VideoCodec | 'AS_IS' | 'DISCARD'>('avc');
 type AudioCodec = 'aac' | 'mp3' | 'opus' | 'vorbis' | 'flac' | 'pcm-s16' | 'pcm-s24' | 'pcm-f32';
@@ -105,9 +107,13 @@ async function transpile() {
     const output = new Output({
       format: container.value === 'mp4'
           ? new Mp4OutputFormat({
-            fastStart: 'fragmented',
-            minimumFragmentDuration: keyFrameSeconds.value,
+            fastStart: 'in-memory',
           })
+          : container.value === 'fmp4'
+            ? new Mp4OutputFormat({
+              fastStart: 'fragmented',
+              minimumFragmentDuration: keyFrameSeconds.value,
+            })
           : container.value === 'mov'
             ? new MovOutputFormat({
               fastStart: 'fragmented',
@@ -133,6 +139,7 @@ async function transpile() {
           width: enableWidth.value ? width.value : undefined,
           height: enableHeight.value ? height.value : undefined,
           fit: fit.value,
+          frameRate: enableFps.value ? Number(fps.value) : undefined,
           forceTranscode: true,
         },
       audio: acodec.value === 'DISCARD' ? {
@@ -237,14 +244,14 @@ async function cancelTranspile() {
           <label class="form-label">Video Size</label>
           <div class="input-group mb-3">
             <div class="input-group-text">
-              <div class="form-check form-switch mt-0">
+              <div class="form-check mt-0">
                 <input class="form-check-input" type="checkbox" id="enableWidth" v-model="enableWidth" aria-label="Enable width">
                 <label class="form-check-label" for="enableWidth">Width</label>
               </div>
             </div>
             <input type="number" class="form-control" :class="$style.whinput" aria-label="Width" v-model="width" />
             <div class="input-group-text">
-              <div class="form-check form-switch mt-0">
+              <div class="form-check mt-0">
                 <input class="form-check-input" type="checkbox" id="enableHeight" v-model="enableHeight" aria-label="Enable height">
                 <label class="form-check-label" for="enableHeight">Height</label>
               </div>
@@ -258,6 +265,26 @@ async function cancelTranspile() {
           </div>
           <label class="form-label">Video Settings</label>
           <div class="input-group mb-3">
+            <div class="input-group-text">
+              <div class="form-check mt-0">
+                <input class="form-check-input" type="checkbox" id="enableFps" v-model="enableFps" aria-label="Enable FPS">
+                <label class="form-check-label" for="enableFps">fps</label>
+              </div>
+            </div>
+            <select class="form-select" id="vFps" aria-label="Video FPS" v-model="fps">
+              <option value="15">15</option>
+              <option value="24">24</option>
+              <option value="25">25</option>
+              <option value="29.97">29.97</option>
+              <option value="30">30</option>
+              <option value="48">48</option>
+              <option value="50">50</option>
+              <option value="59.94">59.94</option>
+              <option value="60">60</option>
+              <option value="100">100</option>
+              <option value="119.88">119.88</option>
+              <option value="120">120</option>
+            </select>
             <div class="form-floating">
               <select class="form-select" id="vBitrate" aria-label="Video Bitrate" v-model="vbitrate">
                 <option value="verylow">Very Low</option>
@@ -306,6 +333,7 @@ async function cancelTranspile() {
           <div class="input-group mb-3">
             <div class="form-floating">
               <select class="form-select" id="formContainer" aria-label="Fit" v-model="container">
+                <option value="fmp4">Fragmented MP4</option>
                 <option value="mp4">MP4</option>
                 <option value="mov">MOV</option>
                 <option value="webm">WebM</option>
